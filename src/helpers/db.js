@@ -86,7 +86,7 @@ export async function getMints(collection) {
 export async function updateMint({ publicKey, debt }) {
   const { data, error } = await supabase
     .from('mints')
-    .update({ debt })
+    .update({ debt, listed: false })
     .eq('mint', publicKey);
 
   if (error) {
