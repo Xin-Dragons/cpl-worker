@@ -332,7 +332,7 @@ export async function addMint({ mint }) {
       mint,
       metadata_url: nft.uri,
       name: nft.name,
-      number
+      number: number || 0
     })
 
   if (error) {
