@@ -168,12 +168,7 @@ export async function markSold({ publicKey, txn }) {
 export async function getMint({ mint }) {
   const { data, error } = await supabase
     .from('mints')
-    .select(`
-      *,
-      collection (
-        active
-      )
-    `)
+    .select('*')
     .eq('mint', mint)
 
   if (error) {
@@ -326,6 +321,10 @@ export async function addMint({ mint }) {
     return;
   }
 
+  const number = nft.edition.isOriginal
+    ? parseInt(nft.name.split('#')[1])
+    : nft.edition.number.toNumber();
+
   const { data, error } = await supabase
     .from('mints')
     .insert({
@@ -333,11 +332,10 @@ export async function addMint({ mint }) {
       mint,
       metadata_url: nft.uri,
       name: nft.name,
-      number: parseInt(nft.name.split('#')[1])
+      number
     })
 
   if (error) {
-    console.log(error)
     throw new Error('Error adding mint')
   }
 
