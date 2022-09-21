@@ -238,15 +238,27 @@ export async function lookupOrAddCollection({ nft }) {
       return;
     }
 
+    let collectionName = collectionNft.name;
+
+    if (collectionName === 'Collection NFT') {
+      collectionName = nft.json.collection && nft.json.collection.name
+        ? nft.json.collection.name
+        : (
+          nft.json.name.includes(' #')
+            ? nft.json.name.split(' #')[0]
+            : nft.json.name.split('#')[0]
+        )
+    }
+
     const { data: update, error: updateError } = await supabase
       .from('collections')
       .insert({
         id: nft.collection.address.toString(),
         lookup_type: 'collection',
-        slug: collectionNft.name.toLowerCase().replace(/\s+/g, '-'),
+        slug: collectionName.toLowerCase().replace(/\s+/g, '-'),
         active: false,
         update_authority: nft.updateAuthorityAddress.toString(),
-        name: collectionNft.name
+        name: collectionName
       })
 
     if (updateError) {
@@ -266,8 +278,6 @@ export async function lookupOrAddCollection({ nft }) {
       .select('*')
       .eq('id', firstVerifiedCreator.address.toString())
 
-    console.log(data)
-
     if (error) {
       throw new Error('Error looking up by creator')
     }
@@ -276,7 +286,7 @@ export async function lookupOrAddCollection({ nft }) {
       return data[0];
     }
 
-    const collectionName = nft.json.collection
+    const collectionName = nft.json.collection && nft.json.collection.name
       ? nft.json.collection.name
       : nft.name.split(' #')[0];
 
@@ -321,6 +331,7 @@ export async function addMint({ mint }) {
     })
 
   if (error) {
+    console.log(error)
     throw new Error('Error adding mint')
   }
 
