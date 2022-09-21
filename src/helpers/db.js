@@ -192,7 +192,26 @@ export async function checkLog({ sig }) {
   return data && data[0];
 }
 
+export async function getLog({ sig }) {
+  const { data, error } = await supabase
+    .from('log')
+    .select('*')
+    .eq('sig', sig);
+
+  if (error) {
+    throw new Error('error looking up log');
+  }
+
+  return data && data[0];
+}
+
 export async function addToLog({ sig, mint, type }) {
+  const log = await getLog({ sig });
+
+  if (log) {
+    return log;
+  }
+
   const { data, error } = await supabase
     .from('log')
     .insert({
@@ -202,6 +221,7 @@ export async function addToLog({ sig, mint, type }) {
     })
 
   if (error) {
+    console.log(error)
     throw new Error('Error logging', sig)
   }
 
@@ -325,6 +345,12 @@ export async function addMint({ mint }) {
     ? parseInt(nft.name.split('#')[1])
     : nft.edition.number.toNumber();
 
+  const item = await getMint({ mint });
+
+  if (item) {
+    return item;
+  }
+
   const { data, error } = await supabase
     .from('mints')
     .insert({
@@ -336,6 +362,7 @@ export async function addMint({ mint }) {
     })
 
   if (error) {
+    console.log(error)
     throw new Error('Error adding mint')
   }
 
