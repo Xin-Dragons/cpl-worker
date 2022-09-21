@@ -264,7 +264,9 @@ export async function lookupOrAddCollection({ nft }) {
     const { data, error } = await supabase
       .from('collections')
       .select('*')
-      .eq('id', firstVerifiedCreator.toString())
+      .eq('id', firstVerifiedCreator.address.toString())
+
+    console.log(data)
 
     if (error) {
       throw new Error('Error looking up by creator')
@@ -290,6 +292,7 @@ export async function lookupOrAddCollection({ nft }) {
       });
 
     if (insertError) {
+      console.log(insertError)
       throw new Error('Error inserting by creator');
     }
 
