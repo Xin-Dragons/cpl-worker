@@ -255,7 +255,10 @@ export async function lookupOrAddCollection({ nft }) {
       .insert({
         id: nft.collection.address.toString(),
         lookup_type: 'collection',
-        slug: collectionName.toLowerCase().replace(/\s+/g, '-'),
+        slug: collectionName
+          .toLowerCase()
+          .replace(/:+/g, '')
+          .replace(/\s+/g, '-'),
         active: false,
         update_authority: nft.updateAuthorityAddress.toString(),
         name: collectionName
@@ -295,7 +298,10 @@ export async function lookupOrAddCollection({ nft }) {
       .insert({
         id: firstVerifiedCreator.address.toString(),
         lookup_type: 'creator',
-        slug: collectionName.toLowerCase().replace(/\s+/g, '-'),
+        slug: collectionName
+          .toLowerCase()
+          .replace(/:+/g, '')
+          .replace(/\s+/g, '-'),
         active: false,
         update_authority: nft.updateAuthorityAddress.toString(),
         name: collectionName
