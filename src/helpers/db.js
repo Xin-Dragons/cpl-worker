@@ -131,7 +131,7 @@ export async function markSold({ publicKey, txn }) {
     return;
   }
 
-  const nft = await metaplex.nfts().findByMint(new PublicKey(publicKey))
+  const nft = await metaplex.nfts().findByMint({ mintAddress: new PublicKey(publicKey) }).run()
   const royalties = nft.sellerFeeBasisPoints / 100;
   const creatorAddresses = nft.creators.map(c => c.address.toString())
   const accountKeys = txn.transaction.message.accountKeys.map((k, i) => {
@@ -213,6 +213,117 @@ export async function addToLog({ sig, mint, type }) {
   return data;
 }
 
+export async function lookupOrAddCollection({ nft }) {
+  if (nft.collection) {
+    if (!nft.collection.verified) {
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('collections')
+      .select('*')
+      .eq('id', nft.collection.address.toString())
+
+    if (error) {
+      throw new Error('Error looking up by creator')
+    }
+
+    if (data && data.length) {
+      return data[0];
+    }
+
+    const collectionNft = await metaplex.nfts().findByMint({ mintAddress: nft.collection.address }).run();
+
+    if (!collectionNft) {
+      return;
+    }
+
+    const { data: update, error: updateError } = await supabase
+      .from('collections')
+      .insert({
+        id: nft.collection.address.toString(),
+        lookup_type: 'collection',
+        slug: collectionNft.name.toLowerCase().replace(/\s+/g, '-'),
+        active: false,
+        update_authority: nft.updateAuthorityAddress.toString(),
+        name: collectionNft.name
+      })
+
+    if (updateError) {
+      throw new Error('Error inserting by collection')
+    }
+
+    return data && data[0]
+
+  } else {
+    const firstVerifiedCreator = nft.creators.find(c => c.verified);
+    if (!firstVerifiedCreator) {
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('collections')
+      .select('*')
+      .eq('id', firstVerifiedCreator.toString())
+
+    if (error) {
+      throw new Error('Error looking up by creator')
+    }
+
+    if (data && data.length) {
+      return data[0];
+    }
+
+    const collectionName = nft.json.collection
+      ? nft.json.collection.name
+      : nft.name.split(' #')[0];
+
+    const { data: insert, error: insertError } = await supabase
+      .from('collections')
+      .insert({
+        id: firstVerifiedCreator.address.toString(),
+        lookup_type: 'creator',
+        slug: collectionName.toLowerCase().replace(/\s+/g, '-'),
+        active: false,
+        update_authority: nft.updateAuthorityAddress.toString(),
+        name: collectionName
+      });
+
+    if (insertError) {
+      throw new Error('Error inserting by creator');
+    }
+
+    return data && data[0];
+  }
+}
+
+export async function addMint({ mint }) {
+  const mintAddress = new PublicKey(mint)
+  const nft = await metaplex.nfts().findByMint({ mintAddress }).run()
+
+  const collection = await lookupOrAddCollection({ nft });
+
+  if (!collection) {
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('mints')
+    .insert({
+      collection: collection.id,
+      mint,
+      metadata_url: nft.uri,
+      name: nft.name,
+      number: parseInt(nft.name.split('#')[1])
+    })
+
+  if (error) {
+    throw new Error('Error adding mint')
+  }
+
+  return data && data[0]
+}
+
 export async function subscribeToProgram({ id, name, purchase_log, listing_log, delisting_log }) {
   connection.onProgramAccountChange(new PublicKey(id), async (a, context) => {
     const slot = await connection.getSlot()
@@ -253,8 +364,13 @@ export async function subscribeToProgram({ id, name, purchase_log, listing_log, 
     const mint = tokens[0].mint;
     const isProtected = await getMint({ mint })
 
-    if (!isProtected || !isProtected.collection.active) {
-      return;
+    if (!isProtected) {
+      const item = await addMint({ mint });
+
+      if (!item) {
+        return;
+      }
+      console.log('added mint', mint)
     }
 
     if (type === 'purchase') {
