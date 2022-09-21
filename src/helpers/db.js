@@ -70,6 +70,28 @@ const limiter = new Bottleneck({
   minTime: 70
 })
 
+export async function cleanup() {
+  const { data, error } = await supabase
+    .from('collections')
+    .select('id')
+
+  const promises = data.map(async item => {
+    const { data, error } = await supabase
+      .from('mints')
+      .select('*')
+      .eq('collection', item.id)
+
+    if (!data.length) {
+      const { data, error } = await supabase
+        .from('collections')
+        .delete()
+        .eq('id', item.id)
+    }
+  });
+
+  await Promise.all(promises)
+}
+
 export async function getMints(collection) {
   const { data, error } = await supabase
     .from('mints')
@@ -214,7 +236,7 @@ export async function addToLog({ sig, mint, type }) {
 
   const { data, error } = await supabase
     .from('log')
-    .insert({
+    .upsert({
       sig,
       mint,
       type
@@ -267,14 +289,13 @@ export async function lookupOrAddCollection({ nft }) {
 
     const { data: update, error: updateError } = await supabase
       .from('collections')
-      .insert({
+      .upsert({
         id: nft.collection.address.toString(),
         lookup_type: 'collection',
         slug: collectionName
           .toLowerCase()
           .replace(/:+/g, '')
           .replace(/\s+/g, '-'),
-        active: false,
         update_authority: nft.updateAuthorityAddress.toString(),
         name: collectionName
       })
@@ -310,14 +331,13 @@ export async function lookupOrAddCollection({ nft }) {
 
     const { data: insert, error: insertError } = await supabase
       .from('collections')
-      .insert({
+      .upsert({
         id: firstVerifiedCreator.address.toString(),
         lookup_type: 'creator',
         slug: collectionName
           .toLowerCase()
           .replace(/:+/g, '')
           .replace(/\s+/g, '-'),
-        active: false,
         update_authority: nft.updateAuthorityAddress.toString(),
         name: collectionName
       });
@@ -353,7 +373,7 @@ export async function addMint({ mint }) {
 
   const { data, error } = await supabase
     .from('mints')
-    .insert({
+    .upsert({
       collection: collection.id,
       mint,
       metadata_url: nft.uri,
