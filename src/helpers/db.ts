@@ -66,6 +66,18 @@ export async function getPrograms() {
   return data;
 }
 
+export async function getCollections() {
+  const { data, error } = await supabase
+    .from('collections')
+    .select('id, slug')
+
+  if (error) {
+    throw new Error('Error looking up collections')
+  }
+
+  return data;
+}
+
 const limiter = new Bottleneck({
   minTime: 70
 })
@@ -95,14 +107,30 @@ export async function cleanup() {
 export async function getMints(collection) {
   const { data, error } = await supabase
     .from('mints')
-    .select('mint')
+    .select('mint, last_sale_transaction')
     .eq('collection', collection.id)
 
   if (error) {
+    console.log(error)
     throw new Error('Error getting mints')
   }
 
-  return data.map(d => d.mint);
+  return data
+}
+
+export async function updateMints({ collection, items }) {
+  const { data, error } = await supabase
+    .from('mints')
+    .upsert(items.map(item => {
+      return {
+        ...item,
+        collection
+      }
+    }))
+
+  if (error) {
+    throw new Error('Error updating mints')
+  }
 }
 
 export async function updateMint({ publicKey, debt }) {
