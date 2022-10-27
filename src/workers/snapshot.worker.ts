@@ -28,8 +28,6 @@ async function runProgram(program) {
 
 }
 
-// console.log(hsClient)
-
 const connection = new Connection(process.env.RPC_HOST)
 const metaplex = new Metaplex(connection)
 
@@ -68,7 +66,7 @@ async function getItems({mints, nfts, collection}) {
   const sales = items.map(item => item.market_place_actions[0])
     .filter(sale => {
       const now = new Date()
-      const yesterday = sub(now, { hours: 24 })
+      const yesterday = sub(now, { hours: 48 })
       const saleTime = new Date(sale.block_timestamp * 1000);
 
       return isAfter(saleTime, yesterday)
@@ -97,7 +95,9 @@ async function getItems({mints, nfts, collection}) {
 
   const promises = res.data.map(async (item, index) => {
     const txn = item.result;
-    const sig = sales[index].signature;
+    const sale = sales[index]
+    const sig = sale.signature;
+    const salePrice = new BN(sale.price * LAMPORTS_PER_SOL)
     const tokenAddress = items[index].token_address;
     const mint = mints.find(m => m.mint === tokenAddress);
     const hasDebt = mint.last_sale_transaction && mint.debt;
@@ -134,11 +134,6 @@ async function getItems({mints, nfts, collection}) {
       return sum;
     }, new BN(0));
 
-    const salePrice = BN.min(...accountKeys.map(k => k.change))
-      .abs()
-      .sub(new BN(ACC_RENT))
-      .sub(new BN(txn.meta.fee))
-
     const expectedCommission = salePrice
       .div(new BN(10000))
       .mul(royalties);
@@ -170,28 +165,13 @@ let retries = 3;
 async function updateCollection(collection) {
   try {
     console.log(`Starting ${collection.slug}`);
-    const mints = await getMints(collection);
+    const mints = await getMints(collection)
     const chunks = chunk(mints, 100);
 
     const nfts = (
       await metaplex.nfts().findAllByMintList({ mints: mints.map(mint => new PublicKey(mint.mint) )})
     )
       .filter(Boolean);
-
-    // const toUpdate = mints.filter(mint => !mint.metadata_url).map(item => {
-    //   const nft = nfts.find(n => n.mintAddress.toString() === item.mint);
-    //   const number = parseInt(nft.name.split('#')[1])
-    //   return {
-    //     mint: item.mint,
-    //     name: nft.name,
-    //     metadata_url: nft.uri,
-    //     number: number || 0
-    //   }
-    // });
-    //
-    // if (toUpdate.length) {
-    //   updateMints({ collection: collection.id, items: toUpdate })
-    // }
 
     const promises = chunks.map(async items => {
       try {

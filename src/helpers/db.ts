@@ -107,7 +107,7 @@ export async function cleanup() {
 export async function getMints(collection) {
   const { data, error } = await supabase
     .from('mints')
-    .select('mint, last_sale_transaction')
+    .select('*')
     .eq('collection', collection.id)
 
   if (error) {
