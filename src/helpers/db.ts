@@ -69,7 +69,7 @@ export async function getPrograms() {
 export async function getCollections() {
   const { data, error } = await supabase
     .from('collections')
-    .select('id, slug')
+    .select('id')
 
   if (error) {
     throw new Error('Error looking up collections')
@@ -106,8 +106,8 @@ export async function cleanup() {
 
 export async function getMints(collection) {
   const { data, error } = await supabase
-    .from('mints')
-    .select('*')
+    .from('nfts')
+    .select('*, sales(*)')
     .eq('collection', collection.id)
 
   if (error) {
@@ -120,15 +120,15 @@ export async function getMints(collection) {
 
 export async function updateMints({ collection, items }) {
   const { data, error } = await supabase
-    .from('mints')
+    .from('sales')
     .upsert(items.map(item => {
       return {
-        ...item,
-        collection
+        ...item
       }
     }))
 
   if (error) {
+    console.log(error)
     throw new Error('Error updating mints')
   }
 }
