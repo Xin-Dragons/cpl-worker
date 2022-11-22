@@ -1,7 +1,7 @@
 import { getPrograms, subscribeToProgram, getCollections, getMints, updateMints } from '../helpers';
 import { HyperspaceClient, type MarketplaceActionEnums } from "hyperspace-client-js";
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js'
-import { Metaplex } from '@metaplex-foundation/js';
+import { createTokenWithMintOperationHandler, Metaplex } from '@metaplex-foundation/js';
 import { chunk, flatten, orderBy } from 'lodash'
 import { isAfter, sub } from 'date-fns';
 import BN from 'bn.js';
@@ -84,14 +84,14 @@ async function getItems({mints, nfts, collection}) {
       
           const lastSale = orderBy(mint.sales, sale => sale.sale_date, "asc").pop()
       
-          const prevSale = new Date(lastSale);
+          const prevSale = new Date(lastSale.sale_date);
           const thisSale = new Date(sale.block_timestamp * 1000);
       
           if (!prevSale || isAfter(thisSale, prevSale)) {
             return true;
           }
         }).filter(sale => {
-          const now = new Date()
+          const now = new Date();
           const yesterday = sub(now, { hours: 730 })
           const saleTime = new Date(sale.block_timestamp * 1000);
     
@@ -242,7 +242,7 @@ async function updateCollection(collection) {
 
 export async function run() {
   try {
-    const collections = await getCollections();
+    const collections = await getCollections()
 
     await collections.reduce((promise, collection) => {
       return promise.then(() => updateCollection(collection))
