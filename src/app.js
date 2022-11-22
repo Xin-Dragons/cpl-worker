@@ -1,8 +1,8 @@
-import { getPrograms, subscribeToProgram, getCollections, getMints, updateMints } from '../helpers';
-import { HyperspaceClient, type MarketplaceActionEnums } from "hyperspace-client-js";
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { getPrograms, subscribeToProgram, getCollections, getMints, updateMints } from './helpers';
+import { HyperspaceClient } from "hyperspace-client-js";
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { createTokenWithMintOperationHandler, Metaplex } from '@metaplex-foundation/js';
-import { chunk, flatten, orderBy } from 'lodash'
+import { chunk, flatten, orderBy } from 'lodash';
 import { isAfter, sub } from 'date-fns';
 import BN from 'bn.js';
 import axios from 'axios';
@@ -39,34 +39,8 @@ async function getItems({mints, nfts, collection}) {
     }
   })
 
-  // only run for new sales since last pass
-  const items = state.getMarketPlaceActionsByToken.filter(item => {
-    return true
-    const mint = mints.find(m => m.mint === item.token_address);
-    // no previous activity
-    if (!mint.sales.length) {
-      return true;
-    }
-
-    // already run for this sale
-    if (mint.sales.find(sale => sale.id === item.market_place_actions[0].signature)) {
-      console.log('skipping')
-      return false;
-    }
-
-    const lastSale = orderBy(mint.sales, sale => sale.sale_date, "asc").pop()
-
-    const prevSale = new Date(lastSale);
-    const thisSale = new Date(item.block_timestamp * 1000);
-
-    if (!prevSale || isAfter(thisSale, prevSale)) {
-      return true;
-    }
-
-    return false;
-
-  });
-
+  const items = state.getMarketPlaceActionsByToken;
+  
   const sales = flatten(
     items.map(
       item => {
@@ -151,7 +125,6 @@ async function getItems({mints, nfts, collection}) {
     const accountKeys = txn.transaction.message.accountKeys.map((k, i) => {
       const before = new BN(txn.meta.preBalances[i])
       const after = new BN(txn.meta.postBalances[i])
-      // console.log(k, after.sub(before).toNumber())
       return {
         key: k,
         change: after.sub(before)
@@ -205,10 +178,10 @@ async function getItems({mints, nfts, collection}) {
 }
 
 let retries = 3;
-async function updateCollection(collection) {
+export async function updateCollection(collection) {
   try {
-    console.log(`Starting ${collection.id}`);
-    const mints = await getMints(collection)
+    console.log(`Starting ${collection}`);
+    const mints = (await getMints(collection))
     const chunks = chunk(mints, 100);
 
     const nfts = (
@@ -218,16 +191,16 @@ async function updateCollection(collection) {
 
     const promises = chunks.map(async items => {
       try {
-        const res = await getItems({ mints: items, nfts, collection: collection.id })
+        const res = await getItems({ mints: items, nfts, collection })
         return res
       } catch {
-        return getItems({ mints: items, nfts, collection: collection.id })
+        return getItems({ mints: items, nfts, collection })
       }
     })
 
     await Promise.all(promises)
 
-    console.log(`Finished ${collection.id}`);
+    console.log(`Finished ${collection}`);
   } catch (err) {
     console.log(err)
     if (--retries) {
@@ -237,20 +210,5 @@ async function updateCollection(collection) {
       retries = 3;
       return;
     }
-  }
-}
-
-export async function run() {
-  try {
-    const collections = await getCollections()
-
-    await collections.reduce((promise, collection) => {
-      return promise.then(() => updateCollection(collection))
-    }, Promise.resolve())
-
-    return run();
-  } catch (err) {
-    console.error('App crashed, restarting')
-    return run();
   }
 }

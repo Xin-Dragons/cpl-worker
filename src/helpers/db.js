@@ -108,7 +108,7 @@ export async function getMints(collection) {
   const { data, error } = await supabase
     .from('nfts')
     .select('*, sales(*)')
-    .eq('collection', collection.id)
+    .eq('collection', collection)
 
   if (error) {
     console.log(error)
