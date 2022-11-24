@@ -1,7 +1,7 @@
 import { getPrograms, subscribeToProgram, getCollections, getMints, updateMints } from '../helpers';
 import { HyperspaceClient, type MarketplaceActionEnums } from "hyperspace-client-js";
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js'
-import { createTokenWithMintOperationHandler, Metaplex } from '@metaplex-foundation/js';
+import { createTokenWithMintOperationHandler, Metaplex, token } from '@metaplex-foundation/js';
 import { chunk, flatten, orderBy } from 'lodash'
 import { isAfter, sub } from 'date-fns';
 import BN from 'bn.js';
@@ -31,7 +31,7 @@ async function runProgram(program) {
 const connection = new Connection(process.env.RPC_HOST)
 const metaplex = new Metaplex(connection)
 
-async function getItems({mints, nfts, collection}) {
+async function getItems({mints, collection}) {
   const state = await hsClient.getTokenHistory({
     condition: {
       tokenAddresses: mints.map(mint => mint.mint),
@@ -100,6 +100,8 @@ async function getItems({mints, nfts, collection}) {
       })
   ).filter(Boolean)
 
+  // console.log(sales)
+
   if (!sales.length) {
     return;
   }
@@ -120,6 +122,7 @@ async function getItems({mints, nfts, collection}) {
   })
 
   const res = await axios.post(RPC_HOST, data, { headers });
+  const nfts = await metaplex.nfts().findAllByMintList({ mints: sales.map(s => new PublicKey(s.token_address)) })
 
   const promises = res.data.map(async (item, index) => {
     const txn = item.result;
@@ -129,7 +132,7 @@ async function getItems({mints, nfts, collection}) {
     const tokenAddress = sale.token_address;
     const mint = mints.find(m => m.mint === tokenAddress);
     const hasDebt = mint.last_sale_transaction && mint.debt;
-    const nft = nfts.find(n => n.mintAddress.toString() === tokenAddress);
+    const nft = nfts.find(n => n.mintAddress.toString() === tokenAddress)
 
     if (!nft) {
       return;
@@ -211,17 +214,12 @@ async function updateCollection(collection) {
     const mints = await getMints(collection)
     const chunks = chunk(mints, 100);
 
-    const nfts = (
-      await metaplex.nfts().findAllByMintList({ mints: mints.map(mint => new PublicKey(mint.mint) )})
-    )
-      .filter(Boolean);
-
     const promises = chunks.map(async items => {
       try {
-        const res = await getItems({ mints: items, nfts, collection: collection.id })
+        const res = await getItems({ mints: items, collection: collection.id })
         return res
       } catch {
-        return getItems({ mints: items, nfts, collection: collection.id })
+        return getItems({ mints: items, collection: collection.id })
       }
     })
 
@@ -242,7 +240,7 @@ async function updateCollection(collection) {
 
 export async function run() {
   try {
-    const collections = await getCollections()
+    const collections = (await getCollections())
 
     await collections.reduce((promise, collection) => {
       return promise.then(() => updateCollection(collection))
