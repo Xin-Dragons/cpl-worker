@@ -122,7 +122,9 @@ async function getItems({mints, collection}) {
   })
 
   const res = await axios.post(RPC_HOST, data, { headers });
-  const nfts = await metaplex.nfts().findAllByMintList({ mints: sales.map(s => new PublicKey(s.token_address)) })
+  const nfts = (
+    await metaplex.nfts().findAllByMintList({ mints: sales.map(s => new PublicKey(s.token_address)) })
+  ).filter(Boolean)
 
   const promises = res.data.map(async (item, index) => {
     const txn = item.result;
