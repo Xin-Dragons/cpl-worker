@@ -1,34 +1,18 @@
-import { getPrograms, subscribeToProgram, getCollections, getMints, updateMints } from '../helpers';
-import { HyperspaceClient, type MarketplaceActionEnums } from "hyperspace-client-js";
+import { getCollections, getMints, updateMints } from '../helpers';
+import { HyperspaceClient, MarketPlaceActions } from "hyperspace-client-js";
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js'
-import { createTokenWithMintOperationHandler, Metaplex, token } from '@metaplex-foundation/js';
+import { Metadata, Metaplex } from '@metaplex-foundation/js';
 import { chunk, flatten, orderBy } from 'lodash'
 import { isAfter, sub } from 'date-fns';
 import BN from 'bn.js';
 import axios from 'axios';
 
-const { API_KEY, RPC_HOST } = process.env;
-
-const ACC_RENT = 2039280;
-
-const METAPLEX_METADATA_PROGRAM = 'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+const API_KEY = process.env.API_KEY as string;
+const RPC_HOST = process.env.RPC_HOST as string;
 
 const hsClient = new HyperspaceClient(API_KEY);
 
-async function runProgram(program) {
-  try {
-    console.log(`Polling ${program.name}`)
-
-    await subscribeToProgram(program)
-
-  } catch (err) {
-    console.log(err)
-    runProgram(program)
-  }
-
-}
-
-const connection = new Connection(process.env.RPC_HOST)
+const connection = new Connection(RPC_HOST, 'confirmed')
 const metaplex = new Metaplex(connection)
 
 async function getItems({mints, collection}) {
@@ -39,40 +23,12 @@ async function getItems({mints, collection}) {
     }
   })
 
-  // only run for new sales since last pass
-  const items = state.getMarketPlaceActionsByToken.filter(item => {
-    return true
-    const mint = mints.find(m => m.mint === item.token_address);
-    // no previous activity
-    if (!mint.sales.length) {
-      return true;
-    }
-
-    // already run for this sale
-    if (mint.sales.find(sale => sale.id === item.market_place_actions[0].signature)) {
-      console.log('skipping')
-      return false;
-    }
-
-    const lastSale = orderBy(mint.sales, sale => sale.sale_date, "asc").pop()
-
-    const prevSale = new Date(lastSale);
-    const thisSale = new Date(item.block_timestamp * 1000);
-
-    if (!prevSale || isAfter(thisSale, prevSale)) {
-      return true;
-    }
-
-    return false;
-
-  });
-
   const sales = flatten(
-    items.map(
+    state.getMarketPlaceActionsByToken.map(
       item => {
         const mint = mints.find(m => m.mint === item.token_address);
 
-        return item.market_place_actions.filter(sale => {
+        return item.market_place_actions.filter((sale: MarketPlaceActions) => {
           if (!mint.sales.length) {
             return true;
           }
@@ -85,7 +41,7 @@ async function getItems({mints, collection}) {
           const lastSale = orderBy(mint.sales, sale => sale.sale_date, "asc").pop()
       
           const prevSale = new Date(lastSale.sale_date);
-          const thisSale = new Date(sale.block_timestamp * 1000);
+          const thisSale = sale.block_timestamp ? new Date(sale.block_timestamp * 1000) : new Date();
       
           if (!prevSale || isAfter(thisSale, prevSale)) {
             return true;
@@ -93,14 +49,12 @@ async function getItems({mints, collection}) {
         }).filter(sale => {
           const now = new Date();
           const yesterday = sub(now, { hours: 730 })
-          const saleTime = new Date(sale.block_timestamp * 1000);
+          const saleTime = sale.block_timestamp ? new Date(sale.block_timestamp * 1000) : new Date();
     
           return isAfter(saleTime, yesterday)
         }).filter(Boolean).map(sale => ({ ...sale, token_address: item.token_address }))
       })
   ).filter(Boolean)
-
-  // console.log(sales)
 
   if (!sales.length) {
     return;
@@ -124,13 +78,13 @@ async function getItems({mints, collection}) {
   const res = await axios.post(RPC_HOST, data, { headers });
   const nfts = (
     await metaplex.nfts().findAllByMintList({ mints: sales.map(s => new PublicKey(s.token_address)) })
-  ).filter(Boolean)
+  ).filter(Boolean) as Metadata[]
 
   const promises = res.data.map(async (item, index) => {
     const txn = item.result;
-    const sale = sales[index]
+    const sale: MarketPlaceActions = sales[index]
     const sig = sale.signature;
-    const salePrice = new BN(sale.price * LAMPORTS_PER_SOL)
+    const salePrice = new BN(sale.price || 0 * LAMPORTS_PER_SOL)
     const tokenAddress = sale.token_address;
     const mint = mints.find(m => m.mint === tokenAddress);
     const hasDebt = mint.last_sale_transaction && mint.debt;
@@ -142,10 +96,6 @@ async function getItems({mints, collection}) {
 
     const metadata = nft.address
 
-    const lastSigs = await connection.getSignaturesForAddress(metadata, { until: sig })
-
-    const showFlag = !!lastSigs.length;
-
     const royalties = new BN(nft.sellerFeeBasisPoints)
     if (!txn) {
       return
@@ -156,7 +106,6 @@ async function getItems({mints, collection}) {
     const accountKeys = txn.transaction.message.accountKeys.map((k, i) => {
       const before = new BN(txn.meta.preBalances[i])
       const after = new BN(txn.meta.postBalances[i])
-      // console.log(k, after.sub(before).toNumber())
       return {
         key: k,
         change: after.sub(before)
@@ -178,10 +127,13 @@ async function getItems({mints, collection}) {
     const commissionOwing = expectedCommission.sub(actualCommission);
 
     let debt;
+    let debt_lamports;
     if (commissionOwing.isZero() || commissionOwing.isNeg()) {
       debt = null;
+      debt_lamports = null;
     } else {
       debt = commissionOwing.toNumber() / LAMPORTS_PER_SOL;
+      debt_lamports = commissionOwing;
     }
     if (debt) {
       console.log(`Adding debt: ${debt} to mint: ${tokenAddress}`);
@@ -194,13 +146,15 @@ async function getItems({mints, collection}) {
       id: sig,
       mint: tokenAddress,
       debt,
+      debt_lamports: debt_lamports.toNumber(),
       sale_date: new Date(txn.blockTime * 1000),
       seller_fee_basis_points: nft.sellerFeeBasisPoints,
       creators: nft.creators,
       sale_price: sale.price,
       buyer: sale.buyer_address,
       seller: sale.seller_address,
-      royalties_paid: actualCommission.toNumber()
+      royalties_paid: actualCommission.toNumber(),
+      expected_royalties: expectedCommission.toNumber()
     }
   })
 
