@@ -146,15 +146,15 @@ async function getItems({mints, collection}) {
       id: sig,
       mint: tokenAddress,
       debt,
-      debt_lamports: debt_lamports.toNumber(),
+      debt_lamports: debt_lamports ? debt_lamports.toNumber() : null,
       sale_date: new Date(txn.blockTime * 1000),
       seller_fee_basis_points: nft.sellerFeeBasisPoints,
       creators: nft.creators,
       sale_price: sale.price,
       buyer: sale.buyer_address,
       seller: sale.seller_address,
-      royalties_paid: actualCommission.toNumber(),
-      expected_royalties: expectedCommission.toNumber()
+      royalties_paid: actualCommission ? actualCommission.toNumber() : null,
+      expected_royalties: expectedCommission ? expectedCommission.toNumber() : null
     }
   })
 
