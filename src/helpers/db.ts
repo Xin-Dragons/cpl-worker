@@ -110,7 +110,10 @@ export async function addSale({ sale, metadata }) {
     .insert(sale)
 
   if (error) {
-    console.log(error)
-    throw new Error('Error updating mints')
+    if (error.message.includes('duplicate key value violates unique constraint')) {
+      return;
+    } else {
+      throw new Error('Error updating mints')
+    }
   }
 }
