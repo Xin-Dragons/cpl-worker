@@ -12,7 +12,8 @@ export async function getSaleForTransaction({
   price,
   nft,
   buyer,
-  seller
+  seller,
+  fromWebhook = false
 }) {
   const salePrice = new BN((price || 0) * LAMPORTS_PER_SOL)
 
@@ -43,6 +44,10 @@ export async function getSaleForTransaction({
     }
     return sum;
   }, new BN(0));
+
+  if (fromWebhook) {
+    console.log(accountKeys, actualCommission.toNumber())
+  }
 
   const expectedCommission = salePrice
     .div(new BN(10000))
@@ -101,7 +106,8 @@ export async function recordSale({ mint, signature, price, buyer, seller }) {
     nft,
     price,
     buyer,
-    seller
+    seller,
+    fromWebhook: true
   })
 
   console.log({ sale })
