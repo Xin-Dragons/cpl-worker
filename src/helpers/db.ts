@@ -30,7 +30,7 @@ export async function getCollections() {
   return data;
 }
 
-export async function getMints(collection) {
+export async function getMints({ collection }) {
   const { data, error } = await supabase
     .from('nfts')
     .select('*, sales(*)')
@@ -39,6 +39,22 @@ export async function getMints(collection) {
   if (error) {
     console.log(error)
     throw new Error('Error getting mints')
+  }
+
+  return data
+}
+
+export async function getMint({ mint }) {
+  const { data, error } = await supabase
+    .from('nfts')
+    .select('*, sales(*)')
+    .eq('mint', mint)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.log(error)
+    throw new Error('Error getting mint')
   }
 
   return data

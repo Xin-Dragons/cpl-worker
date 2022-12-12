@@ -1,10 +1,9 @@
-import { getCollections, getMints, updateMints } from '../helpers';
+import { getCollections, getSaleForTransaction, getMints, updateMints } from '../helpers';
 import { HyperspaceClient, MarketPlaceActions } from "hyperspace-client-js";
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { Connection, PublicKey } from '@solana/web3.js'
 import { Metadata, Metaplex } from '@metaplex-foundation/js';
 import { chunk, flatten, orderBy } from 'lodash'
 import { isAfter, sub } from 'date-fns';
-import BN from 'bn.js';
 import axios from 'axios';
 
 const API_KEY = process.env.API_KEY as string;
@@ -81,81 +80,20 @@ async function getItems({mints, collection}) {
   ).filter(Boolean) as Metadata[]
 
   const promises = res.data.map(async (item, index) => {
-    const txn = item.result;
-    const sale: MarketPlaceActions = sales[index]
-    const sig = sale.signature;
-    const salePrice = new BN(sale.price || 0 * LAMPORTS_PER_SOL)
-    const tokenAddress = sale.token_address;
-    const mint = mints.find(m => m.mint === tokenAddress);
-    const hasDebt = mint.last_sale_transaction && mint.debt;
+    const sale = sales[index]
+    const tokenAddress = sale.token_address
     const nft = nfts.find(n => n.mintAddress.toString() === tokenAddress)
+    const txn = item.result;
 
-    if (!nft) {
-      return;
-    }
-
-    const metadata = nft.address
-
-    const royalties = new BN(nft.sellerFeeBasisPoints)
-    if (!txn) {
-      return
-    }
-
-    const creatorAddresses = nft.creators.map(c => c.address.toString())
-
-    const accountKeys = txn.transaction.message.accountKeys.map((k, i) => {
-      const before = new BN(txn.meta.preBalances[i])
-      const after = new BN(txn.meta.postBalances[i])
-      return {
-        key: k,
-        change: after.sub(before)
-      }
-    })
-    .filter(c => !c.change.isZero())
-
-    const actualCommission = accountKeys.reduce((sum, item) => {
-      if (creatorAddresses.includes(item.key)) {
-        return sum.add(item.change)
-      }
-      return sum;
-    }, new BN(0));
-
-    const expectedCommission = salePrice
-      .div(new BN(10000))
-      .mul(royalties);
-
-    const commissionOwing = expectedCommission.sub(actualCommission);
-
-    let debt;
-    let debt_lamports;
-    if (commissionOwing.isZero() || commissionOwing.isNeg()) {
-      debt = null;
-      debt_lamports = null;
-    } else {
-      debt = commissionOwing.toNumber() / LAMPORTS_PER_SOL;
-      debt_lamports = commissionOwing;
-    }
-    if (debt) {
-      console.log(`Adding debt: ${debt} to mint: ${tokenAddress}`);
-    } else {
-      if (hasDebt) {
-        console.log(`Clearing debt from ${tokenAddress}`)
-      }
-    }
-    return {
-      id: sig,
-      mint: tokenAddress,
-      debt,
-      debt_lamports: debt_lamports ? debt_lamports.toNumber() : null,
-      sale_date: new Date(txn.blockTime * 1000),
-      seller_fee_basis_points: nft.sellerFeeBasisPoints,
-      creators: nft.creators,
-      sale_price: sale.price,
+    return getSaleForTransaction({
+      signature: sale.signature,
+      txn,
+      nft,
+      tokenAddress,
+      price: sale.price,
       buyer: sale.buyer_address,
-      seller: sale.seller_address,
-      royalties_paid: actualCommission ? actualCommission.toNumber() : null,
-      expected_royalties: expectedCommission ? expectedCommission.toNumber() : null
-    }
+      seller: sale.seller_address
+    })
   })
 
   const toUpdate = (await Promise.all(promises)).filter(Boolean);
@@ -167,7 +105,7 @@ let retries = 3;
 async function updateCollection(collection) {
   try {
     console.log(`Starting ${collection.id}`);
-    const mints = await getMints(collection)
+    const mints = await getMints({collection})
     const chunks = chunk(mints, 100);
 
     const promises = chunks.map(async items => {
