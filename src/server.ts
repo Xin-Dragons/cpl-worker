@@ -5,11 +5,10 @@ export const app = express();
 
 app.post('/', bodyParser.json(), (req, res, next) => {
   const [event] = req.body;
-  const nft = event.events.nft;
+  const signature = event.signature;
+  const { mint } = event.tokenTransfers[0]
 
-  console.log(nft);
-  console.log(event.signature)
-  console.log(event.tokenTransfers[0])
+  console.log(mint, signature)
 
   next();
 })
