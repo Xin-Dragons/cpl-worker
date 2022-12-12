@@ -11,8 +11,6 @@ app.post('/', bodyParser.json(), async (req, res, next) => {
   const { amount, buyer, seller, nfts, signature } = event.events.nft;
   const price = amount / LAMPORTS_PER_SOL;
 
-  console.log(price)
-
   await nfts.map((item: any) => recordSale({ mint: item.mint, signature, price, buyer, seller }));
 
   next();
