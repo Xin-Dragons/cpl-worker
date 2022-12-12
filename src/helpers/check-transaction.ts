@@ -106,5 +106,7 @@ export async function recordSale({ mint, signature, price, buyer, seller }) {
     seller
   })
 
+  console.log(sale)
+
   await addSale({ sale, metadata: nft.json })
 }
