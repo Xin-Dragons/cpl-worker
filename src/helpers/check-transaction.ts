@@ -15,6 +15,18 @@ export async function getSaleForTransaction({
   seller,
   fromWebhook = false
 }) {
+  if (fromWebhook) {
+
+    console.log({
+      txn,
+      signature,
+      tokenAddress,
+      price,
+      nft,
+      buyer,
+      seller,
+    })
+  }
   const salePrice = new BN((price || 0) * LAMPORTS_PER_SOL)
 
   if (!nft) {
