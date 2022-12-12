@@ -39,7 +39,6 @@ export async function getSaleForTransaction({
   }
 
   const creatorAddresses = nft.creators.map(c => c.address.toString())
-  console.log(creatorAddresses);
 
   const accountKeys = txn.transaction.message.accountKeys.map((k, i) => {
     const before = new BN(txn.meta.preBalances[i])
@@ -57,10 +56,6 @@ export async function getSaleForTransaction({
     }
     return sum;
   }, new BN(0));
-
-  if (fromWebhook) {
-    console.log(accountKeys, actualCommission.toNumber())
-  }
 
   const expectedCommission = salePrice
     .div(new BN(10000))
@@ -122,8 +117,6 @@ export async function recordSale({ mint, signature, price, buyer, seller }) {
     seller,
     fromWebhook: true
   })
-
-  console.log({ sale })
 
   await addSale({ sale, metadata: nft.json })
 }
