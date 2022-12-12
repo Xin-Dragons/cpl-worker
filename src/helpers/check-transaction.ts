@@ -39,6 +39,7 @@ export async function getSaleForTransaction({
   }
 
   const creatorAddresses = nft.creators.map(c => c.address.toString())
+  console.log(creatorAddresses);
 
   const accountKeys = txn.transaction.message.accountKeys.map((k, i) => {
     const before = new BN(txn.meta.preBalances[i])
@@ -51,7 +52,7 @@ export async function getSaleForTransaction({
   .filter(c => !c.change.isZero())
 
   const actualCommission = accountKeys.reduce((sum, item) => {
-    if (creatorAddresses.includes(item.key)) {
+    if (creatorAddresses.includes(item.key.toString())) {
       return sum.add(item.change)
     }
     return sum;
