@@ -37,8 +37,6 @@ export async function getSaleForTransaction({
   })
   .filter(c => !c.change.isZero())
 
-  console.log(accountKeys)
-
   const actualCommission = accountKeys.reduce((sum, item) => {
     if (creatorAddresses.includes(item.key)) {
       return sum.add(item.change)
@@ -94,7 +92,7 @@ export async function recordSale({ mint, signature, price, buyer, seller }) {
   }
 
   const nft = await metaplex.nfts().findByMint({ mintAddress: new PublicKey(mint) });
-  const txn = await connection.getParsedTransaction(signature);
+  const txn = await connection.getTransaction(signature);
 
   const sale = await getSaleForTransaction({
     signature,
@@ -106,7 +104,7 @@ export async function recordSale({ mint, signature, price, buyer, seller }) {
     seller
   })
 
-  console.log(sale)
+  console.log({ sale })
 
   await addSale({ sale, metadata: nft.json })
 }
