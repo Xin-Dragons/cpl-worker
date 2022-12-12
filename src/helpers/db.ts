@@ -57,7 +57,7 @@ export async function getMint({ mint }) {
 export async function addSales({ items }) {
   const { data, error } = await supabase
     .from('sales')
-    .insert(items.map(item => {
+    .upsert(items.map(item => {
       return {
         ...item
       }
@@ -86,21 +86,9 @@ export async function updateMint({ mint, metadata }) {
 
 export async function addSale({ sale, metadata }) {
   await updateMint({ mint: sale.mint, metadata })
-  const found = await supabase
-    .from('sales')
-    .select('id')
-    .eq('id', sale.id)
-    .eq('mint', sale.mint)
-    .limit(1)
-    .maybeSingle()
-
-  if (found.data) {
-    return;
-  }
-  
   const { data, error } = await supabase
     .from('sales')
-    .insert(sale)
+    .upsert(sale)
 
   if (error) {
     console.log(error)
