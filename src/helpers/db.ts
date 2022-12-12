@@ -57,7 +57,7 @@ export async function getMint({ mint }) {
 export async function addSales({ items }) {
   const { data, error } = await supabase
     .from('sales')
-    .upsert(items.map(item => {
+    .insert(items.map(item => {
       return {
         ...item
       }
@@ -88,7 +88,7 @@ export async function addSale({ sale, metadata }) {
   await updateMint({ mint: sale.mint, metadata })
   const { data, error } = await supabase
     .from('sales')
-    .upsert(sale)
+    .insert(sale)
 
   if (error) {
     console.log(error)
