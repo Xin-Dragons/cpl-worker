@@ -83,6 +83,10 @@ export async function getSaleForTransaction({
 
 export async function recordSale({ mint, signature, price, buyer, seller }) {
   const mintFromDb = await getMint({ mint });
+  // mint not included
+  if (!mintFromDb) {
+    return
+  }
 
   if (mintFromDb?.sales?.find(s => s.id === signature)) {
     console.log('Already recorded, skipping');
@@ -102,5 +106,5 @@ export async function recordSale({ mint, signature, price, buyer, seller }) {
     seller
   })
 
-  await addSale({ sale })
+  await addSale({ sale, metadata: nft.json })
 }

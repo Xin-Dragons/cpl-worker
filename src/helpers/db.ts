@@ -2,7 +2,7 @@ import fs from 'fs';
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js'
 import { Metaplex } from '@metaplex-foundation/js';
 import { getAssociatedTokenAddress } from '@solana/spl-token'
-import { pick, flatten, findKey, uniqBy, chunk, get, groupBy } from 'lodash';
+import { pick, flatten, findKey, uniqBy, chunk, get, groupBy, update } from 'lodash';
 import { add, isBefore, sub, isAfter, differenceInSeconds } from 'date-fns';
 import { createClient } from '@supabase/supabase-js';
 import Bottleneck from 'bottleneck'
@@ -69,7 +69,23 @@ export async function addSales({ items }) {
   }
 }
 
-export async function addSale({ sale }) {
+export async function updateMint({ mint, metadata }) {
+  if (!mint || !metadata) {
+    return;
+  }
+  const { data, error } = await supabase
+    .from('nfts')
+    .upsert({ mint, metadata })
+
+  if (error) {
+    throw new Error('Error updating mint');
+  }
+
+  return data;
+}
+
+export async function addSale({ sale, metadata }) {
+  await updateMint({ mint: sale.mint, metadata })
   const { data, error } = await supabase
     .from('sales')
     .upsert(sale)
