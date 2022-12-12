@@ -1,5 +1,5 @@
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { getMint } from '../helpers';
+import { getMint, addSale } from '../helpers';
 import BN from "bn.js";
 import { metaplex } from "./metaplex";
 
@@ -14,7 +14,7 @@ export async function getSaleForTransaction({
   buyer,
   seller
 }) {
-  const salePrice = new BN(price || 0 * LAMPORTS_PER_SOL)
+  const salePrice = new BN((price || 0) * LAMPORTS_PER_SOL)
 
   if (!nft) {
     return;
@@ -37,6 +37,8 @@ export async function getSaleForTransaction({
   })
   .filter(c => !c.change.isZero())
 
+  console.log(accountKeys)
+
   const actualCommission = accountKeys.reduce((sum, item) => {
     if (creatorAddresses.includes(item.key)) {
       return sum.add(item.change)
@@ -46,7 +48,7 @@ export async function getSaleForTransaction({
 
   const expectedCommission = salePrice
     .div(new BN(10000))
-    .mul(royalties);
+    .mul(royalties)
 
   const commissionOwing = expectedCommission.sub(actualCommission);
 
@@ -100,5 +102,5 @@ export async function recordSale({ mint, signature, price, buyer, seller }) {
     seller
   })
 
-  console.log(sale)
+  await addSale({ sale })
 }

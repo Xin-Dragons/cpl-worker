@@ -12,12 +12,6 @@ const supabaseUrl = process.env.DB_URL as string;
 const supabaseServiceKey = process.env.DB_SECRET as string;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-const connection = new Connection(process.env.RPC_HOST as string);
-const metaplex = new Metaplex(connection);
-
-const ACC_RENT = 2039280;
-const TXN_FEE = 5000;
-
 export async function getCollections() {
   const { data, error } = await supabase
     .from('collections')
@@ -60,7 +54,7 @@ export async function getMint({ mint }) {
   return data
 }
 
-export async function updateMints({ collection, items }) {
+export async function addSales({ items }) {
   const { data, error } = await supabase
     .from('sales')
     .upsert(items.map(item => {
@@ -68,6 +62,17 @@ export async function updateMints({ collection, items }) {
         ...item
       }
     }))
+
+  if (error) {
+    console.log(error)
+    throw new Error('Error updating mints')
+  }
+}
+
+export async function addSale({ sale }) {
+  const { data, error } = await supabase
+    .from('sales')
+    .upsert(sale)
 
   if (error) {
     console.log(error)

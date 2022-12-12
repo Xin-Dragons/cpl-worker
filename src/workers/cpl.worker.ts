@@ -1,4 +1,4 @@
-import { getCollections, getSaleForTransaction, getMints, updateMints } from '../helpers';
+import { getCollections, getSaleForTransaction, getMints, addSales } from '../helpers';
 import { HyperspaceClient, MarketPlaceActions } from "hyperspace-client-js";
 import { Connection, PublicKey } from '@solana/web3.js'
 import { Metadata, Metaplex } from '@metaplex-foundation/js';
@@ -79,7 +79,7 @@ async function getItems({mints, collection}) {
     await metaplex.nfts().findAllByMintList({ mints: sales.map(s => new PublicKey(s.token_address)) })
   ).filter(Boolean) as Metadata[]
 
-  const promises = res.data.map(async (item, index) => {
+  const promises = res.data.map(async (item: any, index: number) => {
     const sale = sales[index]
     const tokenAddress = sale.token_address
     const nft = nfts.find(n => n.mintAddress.toString() === tokenAddress)
@@ -98,7 +98,7 @@ async function getItems({mints, collection}) {
 
   const toUpdate = (await Promise.all(promises)).filter(Boolean);
 
-  await updateMints({ collection, items: toUpdate })
+  await addSales({ items: toUpdate })
 }
 
 let retries = 3;
@@ -134,7 +134,7 @@ async function updateCollection(collection) {
 
 export async function run() {
   try {
-    const collections = (await getCollections())
+    const collections = (await getCollections()).filter(c => c.id === 'lily')
 
     await collections.reduce((promise, collection) => {
       return promise.then(() => updateCollection(collection))
@@ -142,6 +142,7 @@ export async function run() {
 
     return run();
   } catch (err) {
+    console.log(err)
     console.error('App crashed, restarting')
     return run();
   }
