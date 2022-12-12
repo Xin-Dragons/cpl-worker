@@ -84,11 +84,30 @@ export async function updateMint({ mint, metadata }) {
   return data;
 }
 
-export async function addSale({ sale, metadata }) {
-  await updateMint({ mint: sale.mint, metadata })
+export async function getExistingSale({ id, mint }) {
   const { data, error } = await supabase
     .from('sales')
-    .upsert(sale)
+    .select('id')
+    .match({ id, mint })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error('Error looking up sale')
+  }
+
+  return data;
+}
+
+export async function addSale({ sale, metadata }) {
+  await updateMint({ mint: sale.mint, metadata });
+  const existing = await getExistingSale({ sale });
+  if (existing) { 
+    return;
+  }
+  const { data, error } = await supabase
+    .from('sales')
+    .insert(sale)
 
   if (error) {
     console.log(error)
