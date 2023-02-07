@@ -14,5 +14,5 @@ app.post('/', bodyParser.json(), async (req, res, next) => {
 
   await nfts.map((item: any) => recordSale({ mint: item.mint, signature, price, buyer, seller }));
 
-  next();
+  res.status(200).send('OK')
 })
