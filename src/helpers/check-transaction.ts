@@ -13,9 +13,12 @@ export async function getSaleForTransaction({
   nft,
   buyer,
   seller,
+  royaltiesPaid,
   fromWebhook = false
 }) {
-  const salePrice = new BN((price || 0) * LAMPORTS_PER_SOL)
+  const salePrice = price instanceof BN
+    ? price
+    : new BN((price || 0) * LAMPORTS_PER_SOL)
 
   if (!nft) {
     return;
@@ -38,8 +41,11 @@ export async function getSaleForTransaction({
   })
   .filter(c => !c.change.isZero())
 
-  const actualCommission = accountKeys.reduce((sum, item) => {
+  const actualCommission = royaltiesPaid || accountKeys.reduce((sum, item) => {
     if (creatorAddresses.includes(item.key.toString())) {
+      if (item.key.toString() === buyer) {
+        return sum.add(item.change.add(price))
+      }
       return sum.add(item.change)
     }
     return sum;
@@ -51,9 +57,9 @@ export async function getSaleForTransaction({
 
   const commissionOwing = expectedCommission.sub(actualCommission);
 
-  let debt;
-  let debt_lamports;
-  if (commissionOwing.isZero() || commissionOwing.isNeg()) {
+  let debt: number | null;
+  let debt_lamports: BN | null;
+  if (commissionOwing.isZero() || commissionOwing.isNeg() || commissionOwing.lte(new BN(5000))) {
     debt = null;
     debt_lamports = null;
   } else {
@@ -72,10 +78,10 @@ export async function getSaleForTransaction({
     sale_date: new Date(txn.blockTime * 1000),
     seller_fee_basis_points: nft.sellerFeeBasisPoints,
     creators: nft.creators,
-    sale_price: price,
+    sale_price: price instanceof BN ? price.toNumber() / LAMPORTS_PER_SOL : price,
     buyer,
     seller,
-    royalties_paid: actualCommission ? actualCommission.toNumber() : null,
+    royalties_paid: (actualCommission ? actualCommission.toNumber() : null),
     expected_royalties: expectedCommission ? expectedCommission.toNumber() : null
   }
 }
@@ -103,7 +109,8 @@ export async function recordSale({ mint, signature, price, buyer, seller }) {
     price,
     buyer,
     seller,
-    fromWebhook: true
+    fromWebhook: true,
+    royaltiesPaid: undefined
   })
 
   await addSale({ sale, metadata: nft.json })

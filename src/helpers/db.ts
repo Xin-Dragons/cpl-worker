@@ -59,7 +59,8 @@ export async function addSales({ items }) {
     .from('sales')
     .upsert(items.map(item => {
       return {
-        ...item
+        ...item,
+        patched: true
       }
     }))
 

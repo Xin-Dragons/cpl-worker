@@ -1,13 +1,15 @@
 import { getCollections, getSaleForTransaction, getMints, addSales } from '../helpers';
 import { HyperspaceClient, MarketPlaceActions } from "hyperspace-client-js";
-import { Connection, PublicKey } from '@solana/web3.js'
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
 import { Metadata, Metaplex } from '@metaplex-foundation/js';
 import { chunk, flatten, orderBy } from 'lodash'
 import { isAfter, sub } from 'date-fns';
 import axios from 'axios';
+import BN from 'bn.js';
 
 const API_KEY = process.env.API_KEY as string;
 const RPC_HOST = process.env.RPC_HOST as string;
+const CC_PROGRAM_ADDRESS = "mmm3XBJg5gk8XJxEKBvdgptZz6SgK4tXvn36sodowMc";
 
 const hsClient = new HyperspaceClient(API_KEY);
 
@@ -31,9 +33,10 @@ async function getItems({mints, collection}) {
           if (!mint.sales.length) {
             return true;
           }
+          const isMmm = sale.marketplace_program_id === CC_PROGRAM_ADDRESS;
       
           // already run for this sale
-          if (mint.sales.find(s => s.id === sale.signature)) {
+          if (mint.sales.find(s => s.id === sale.signature) && (!isMmm || mint.sales.find(s => s.id === sale.signature).patched)) {
             return false
           }
       
@@ -42,12 +45,12 @@ async function getItems({mints, collection}) {
           const prevSale = new Date(lastSale.sale_date);
           const thisSale = sale.block_timestamp ? new Date(sale.block_timestamp * 1000) : new Date();
       
-          if (!prevSale || isAfter(thisSale, prevSale)) {
+          if (!prevSale || isAfter(thisSale, prevSale) || isMmm) {
             return true;
           }
         }).filter(sale => {
           const now = new Date();
-          const yesterday = sub(now, { hours: 730 })
+          const yesterday = sub(now, { hours: 900 })
           const saleTime = sale.block_timestamp ? new Date(sale.block_timestamp * 1000) : new Date();
     
           return isAfter(saleTime, yesterday)
@@ -85,14 +88,39 @@ async function getItems({mints, collection}) {
     const nft = nfts.find(n => n.mintAddress.toString() === tokenAddress)
     const txn = item.result;
 
+    if (!txn) {
+      return
+    }
+
+    function getPriceFromLogs(txn, fallback) {
+      try {
+        
+      } catch {
+        return fallback
+      }
+    }
+
+    let price = sale.price as number * LAMPORTS_PER_SOL;
+    let royaltiesPaid: BN | undefined;
+
+    if (sale.marketplace_program_id === CC_PROGRAM_ADDRESS) {
+      const msg = txn.meta.logMessages.find(msg => {
+        return msg.includes('"total_price"')
+      })
+      const parsed = JSON.parse(msg.replace("Program log: ", ""))
+      price = parsed.total_price;
+      royaltiesPaid = new BN(parsed.royalty_paid);
+    }
+
     return getSaleForTransaction({
       signature: sale.signature,
       txn,
       nft,
       tokenAddress,
-      price: sale.price,
+      price: new BN(price),
       buyer: sale.buyer_address,
-      seller: sale.seller_address
+      seller: sale.seller_address,
+      royaltiesPaid
     })
   })
 
