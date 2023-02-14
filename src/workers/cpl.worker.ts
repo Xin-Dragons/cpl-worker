@@ -85,19 +85,11 @@ async function getItems({mints, collection}) {
   const promises = res.data.map(async (item: any, index: number) => {
     const sale = sales[index]
     const tokenAddress = sale.token_address
-    const nft = nfts.find(n => n.mintAddress.toString() === tokenAddress)
+    const nft = nfts.find(n => n.mintAddress.toString() === tokenAddress) as Metadata
     const txn = item.result;
 
     if (!txn) {
       return
-    }
-
-    function getPriceFromLogs(txn, fallback) {
-      try {
-        
-      } catch {
-        return fallback
-      }
     }
 
     let price = sale.price as number * LAMPORTS_PER_SOL;
@@ -112,15 +104,27 @@ async function getItems({mints, collection}) {
       royaltiesPaid = new BN(parsed.royalty_paid);
     }
 
+    let effectiveRoyalties: any;
+
+    if (collection["historical-royalties"].length) {
+      const saleDate = txn.blockTime * 1000;
+      effectiveRoyalties = collection["historical-royalties"].find((item: any) => {
+        const startDate = item.active_from ? Date.parse(item.active_from) : 0;
+        const endDate = item.active_to ? Date.parse(item.active_to) : Infinity;
+        return startDate <= saleDate && endDate > saleDate
+      })
+    }
+
     return getSaleForTransaction({
-      signature: sale.signature,
+      signature: sale.signature as string,
       txn,
       nft,
       tokenAddress,
       price: new BN(price),
-      buyer: sale.buyer_address,
-      seller: sale.seller_address,
-      royaltiesPaid
+      buyer: sale.buyer_address as string,
+      seller: sale.seller_address as string,
+      royaltiesPaid,
+      effectiveRoyalties
     })
   })
 
@@ -138,10 +142,10 @@ async function updateCollection(collection) {
 
     const promises = chunks.map(async items => {
       try {
-        const res = await getItems({ mints: items, collection: collection.id })
+        const res = await getItems({ mints: items, collection })
         return res
       } catch {
-        return getItems({ mints: items, collection: collection.id })
+        return getItems({ mints: items, collection })
       }
     })
 

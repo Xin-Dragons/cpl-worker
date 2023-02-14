@@ -1,4 +1,5 @@
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import type { Metadata } from "@metaplex-foundation/js";
 import { getMint, addSale } from '../helpers';
 import BN from "bn.js";
 import { metaplex } from "./metaplex";
@@ -14,7 +15,19 @@ export async function getSaleForTransaction({
   buyer,
   seller,
   royaltiesPaid,
-  fromWebhook = false
+  fromWebhook = false,
+  effectiveRoyalties
+}: {
+  signature: string,
+  tokenAddress: string,
+  txn: any,
+  nft: Metadata,
+  price: BN | number,
+  buyer: string,
+  seller: string,
+  fromWebhook?: boolean,
+  royaltiesPaid?: BN,
+  effectiveRoyalties?: any,
 }) {
   const salePrice = price instanceof BN
     ? price
@@ -24,12 +37,12 @@ export async function getSaleForTransaction({
     return;
   }
 
-  const royalties = new BN(nft.sellerFeeBasisPoints)
+  const royalties = new BN(effectiveRoyalties?.seller_fee_basis_points || nft.sellerFeeBasisPoints)
   if (!txn) {
     return
   }
 
-  const creatorAddresses = nft.creators.map(c => c.address.toString())
+  const creatorAddresses = effectiveRoyalties?.creators?.map(c => c.address) || nft.creators.map(c => c.address.toString())
 
   const accountKeys = txn.transaction.message.accountKeys.map((k, i) => {
     const before = new BN(txn.meta.preBalances[i])
@@ -109,8 +122,7 @@ export async function recordSale({ mint, signature, price, buyer, seller }) {
     price,
     buyer,
     seller,
-    fromWebhook: true,
-    royaltiesPaid: undefined
+    fromWebhook: true
   })
 
   await addSale({ sale, metadata: nft.json })

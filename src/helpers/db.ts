@@ -15,7 +15,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 export async function getCollections() {
   const { data, error } = await supabase
     .from('collections')
-    .select('id')
+    .select('id, historical-royalties(*)')
 
   if (error) {
     throw new Error('Error looking up collections')
