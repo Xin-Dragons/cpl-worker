@@ -102,8 +102,7 @@ export async function getExistingSale({ id, mint }) {
 }
 
 export async function addSale({ sale, metadata }) {
-  await updateMint({ mint: sale.mint, metadata });
-  const existing = await getExistingSale({ sale });
+  const existing = await getExistingSale(sale);
   if (existing) { 
     return;
   }
