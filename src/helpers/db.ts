@@ -79,6 +79,7 @@ export async function updateMint({ mint, metadata }) {
     .upsert({ mint, metadata })
 
   if (error) {
+    console.log(error)
     throw new Error('Error updating mint');
   }
 
