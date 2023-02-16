@@ -125,5 +125,7 @@ export async function recordSale({ mint, signature, price, buyer, seller }) {
     fromWebhook: true
   })
 
+  console.log(sale)
+
   await addSale({ sale, metadata: nft.json })
 }
