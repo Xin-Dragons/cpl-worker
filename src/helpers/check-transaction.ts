@@ -100,32 +100,36 @@ export async function getSaleForTransaction({
 }
 
 export async function recordSale({ mint, signature, price, buyer, seller }) {
-  const mintFromDb = await getMint({ mint });
-  // mint not included
-  if (!mintFromDb) {
-    return
+  try {
+    const mintFromDb = await getMint({ mint });
+    // mint not included
+    if (!mintFromDb) {
+      return
+    }
+  
+    if (mintFromDb?.sales?.find(s => s.id === signature)) {
+      console.log('Already recorded, skipping');
+      return;
+    }
+  
+    const nft = await metaplex.nfts().findByMint({ mintAddress: new PublicKey(mint) });
+    const txn = await connection.getTransaction(signature);
+  
+    const sale = await getSaleForTransaction({
+      signature,
+      tokenAddress: mint,
+      txn,
+      nft,
+      price,
+      buyer,
+      seller,
+      fromWebhook: true
+    })
+  
+    console.log({sale})
+  
+    await addSale({ sale, metadata: nft.json })
+  } catch (err) {
+    console.log(err)
   }
-
-  if (mintFromDb?.sales?.find(s => s.id === signature)) {
-    console.log('Already recorded, skipping');
-    return;
-  }
-
-  const nft = await metaplex.nfts().findByMint({ mintAddress: new PublicKey(mint) });
-  const txn = await connection.getTransaction(signature);
-
-  const sale = await getSaleForTransaction({
-    signature,
-    tokenAddress: mint,
-    txn,
-    nft,
-    price,
-    buyer,
-    seller,
-    fromWebhook: true
-  })
-
-  console.log(sale)
-
-  await addSale({ sale, metadata: nft.json })
 }
