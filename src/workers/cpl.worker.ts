@@ -1,9 +1,9 @@
 import { getCollections, getSaleForTransaction, getMints, addSales } from '../helpers';
 import { HyperspaceClient, MarketPlaceActions } from "hyperspace-client-js";
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
-import { Metadata, Metaplex } from '@metaplex-foundation/js';
-import { chunk, flatten, orderBy } from 'lodash'
-import { isAfter, sub } from 'date-fns';
+import { auctionHouseModule, Metadata, Metaplex } from '@metaplex-foundation/js';
+import { chunk, flatten, isEmpty, orderBy, partition } from 'lodash'
+import { isAfter, isThisMinute, sub } from 'date-fns';
 import axios from 'axios';
 import BN from 'bn.js';
 
@@ -69,7 +69,7 @@ async function getItems({mints, collection}) {
   const data = sales.map(sale => {
     return {
       "jsonrpc": "2.0",
-      "id": 3,
+      "id": sale.token_address,
       "method": "getTransaction",
       "params": [
         sale.signature
@@ -86,7 +86,24 @@ async function getItems({mints, collection}) {
     const sale = sales[index]
     const tokenAddress = sale.token_address
     const nft = nfts.find(n => n.mintAddress.toString() === tokenAddress) as Metadata
-    const txn = item.result;
+
+    let txn = item.result;
+
+    if (!txn && item.error?.message?.includes('Transaction version (0)')) {
+      const data = {
+        "jsonrpc": "2.0",
+        "method": "getTransaction",
+        "id": sale.token_address,
+        "params": [
+          sale.signature,
+          {
+            maxSupportedTransactionVersion: 0
+          }
+        ]
+      }
+      const res = await axios.post(RPC_HOST, data, { headers })
+      txn = res.data.result;
+    }
 
     if (!txn) {
       return
